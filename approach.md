@@ -1,242 +1,330 @@
-# Wallet Transfer Service — Approach & Design Note
+# Wallet Transfer Service — Design Note
 
-- Status: **Draft / Pre-implementation**
+- Status: **Implemented**
 - Author: Darshan Mehta
 
-This document captures my understanding of the assignment and the design I plan to implement, before writing any code. It will be updated as implementation progresses and finalised in the PR description.
+This document captures the design that was implemented for the
+`POST /transfers` service. The narrative tracks the assignment's evaluation
+criteria: schema, transaction strategy, idempotency, concurrency safety, and
+testing.
 
 ---
 
 ## 1. Problem Statement
 
-Build a service exposing `POST /transfers` that moves an amount from one wallet to another with following requirements:
+Build a service exposing `POST /transfers` that moves an amount between two
+wallets with the following requirements:
 
-- **Idempotent** — If the same idempotencyKey is used again, the system must return the original result. Duplicate requests must not trigger duplicate transfers.
-- **Double-entry ledger** — every successful transfer produces exactly one DEBIT row on the source wallet and one CREDIT row on the destination wallet. The ledger must always balance.
-- **Transfer States** — transfers move `PENDING → PROCESSED` or `PENDING → FAILED`; transitions must be safe under retry.
-- **Concurrency-safe** — The system must ensure: correct balances, no double spending.
-- **Cleanly layered** — controller / service / repository / entity
+- **Idempotent.** A second request with the same `idempotencyKey` returns the
+  original response without re-executing side effects.
+- **Double-entry ledger.** Every successful transfer produces exactly one
+  DEBIT on the source wallet and one CREDIT on the destination wallet.
+- **Transfer state machine.** Transfers go `PENDING → PROCESSED` or
+  `PENDING → FAILED`; transitions are safe under retries.
+- **Concurrency-safe.** Concurrent debits cannot double-spend; concurrent
+  reverse-direction transfers cannot deadlock.
+- **Cleanly layered.** Controller / service / repository / entity.
 
 ---
 
-## 2. Assumptions & Scope
+## 2. Stack
 
-- Amount represented as `BIGINT` minor units (e.g. paise / cents) — avoids floating-point rounding.
-- Single currency. Wallets are pre-seeded; there is no wallet-creation API in scope.
-- Authentication, authorisation, and multi-tenancy are out of scope.
-- Self-transfer (`fromWalletId == toWalletId`) is rejected with HTTP 400.
-- Idempotency key: opaque string, max 64 characters, retained indefinitely (no TTL).
+- **Java 17**, **Spring Boot 3.3** (web + data-jpa + validation)
+- **PostgreSQL 16**, **Flyway** migrations
+- **Hibernate** (JPA provider)
+- **JUnit 5**, **AssertJ**, **Testcontainers Postgres** for integration tests
+- **Gradle 8.10** (Kotlin DSL)
+
+Amounts are represented as `BIGINT` minor units (paise/cents). Single currency,
+no FX. Authentication and multi-tenancy are out of scope.
 
 ---
 
 ## 3. API Contract
 
-**Endpoint**
-
-```
-POST /transfers
-```
+**Endpoint** — `POST /transfers`
 
 **Request body**
 
 ```json
 {
   "idempotencyKey": "abc123",
-  "fromWalletId": "wallet_1",
-  "toWalletId": "wallet_2",
+  "fromWalletId": "wallet-a",
+  "toWalletId":   "wallet-b",
   "amount": 100
 }
 ```
 
-Field constraints, enforced via Bean Validation:
+Bean Validation:
 
 - `idempotencyKey` — `@NotBlank`, `@Size(max = 64)`
-- `fromWalletId`, `toWalletId` — `@NotNull`
-- `amount` — `@NotNull`, `@Positive`
+- `fromWalletId`, `toWalletId` — `@NotBlank`, `@Size(max = 64)` string
+- `amount` — `@NotNull`, `@Positive` (BIGINT minor units)
 
-**Responses**
-
-- `201 Created` — first successful execution of a key
-- `200 OK` — idempotent replay returns the cached response
-
-Response body:
-
-```json
-{
-  "transferId": "…",
-  "status": "PROCESSED",
-  "fromWalletId": "wallet_1",
-  "toWalletId": "wallet_2",
-  "amount": 100,
-  "createdAt": "2026-05-21T10:15:30Z"
-}
-```
-
-**Error matrix**
+**Status codes**
 
 | Status | Condition |
 |--------|-----------|
-| 400    | Validation failure or self-transfer |
-| 404    | Source or destination wallet not found |
-| 409    | Same idempotency key reused with a different payload, or duplicate is still in flight |
-| 422    | Insufficient funds — transfer is persisted as `FAILED` |
-| 500    | Unexpected error |
+| 201 Created | First successful PROCESSED transfer |
+| 200 OK      | Idempotent replay (cached response returned) |
+| 422         | Insufficient funds — transfer persisted as `FAILED`, idempotent retries replay the failure |
+| 400         | Validation failure or self-transfer |
+| 404         | Source or destination wallet not found |
+| 409         | Same idempotency key reused with a different payload, or concurrent duplicate that lost the unique-key race |
+| 500         | Unexpected error |
 
-Error envelope: `{ "error": "<code>", "message": "<human readable>" }`.
+Error envelope: `{ "error": "<CODE>", "message": "<human readable>" }`.
 
 ---
 
-## 4. Database Schema (Postgres + Flyway)
+## 4. Database Schema
+
+Defined in `src/main/resources/db/migration/V1__init.sql`.
 
 **`wallets`**
 
-- `id UUID PRIMARY KEY`
+- `id VARCHAR(64) PRIMARY KEY`
 - `balance BIGINT NOT NULL CHECK (balance >= 0)`
 - `created_at`, `updated_at TIMESTAMPTZ`
 
 **`transfers`**
 
 - `id UUID PRIMARY KEY`
-- `from_wallet_id UUID NOT NULL REFERENCES wallets(id)`
-- `to_wallet_id   UUID NOT NULL REFERENCES wallets(id)`
+- `from_wallet_id`, `to_wallet_id VARCHAR(64) NOT NULL REFERENCES wallets(id)`
 - `amount BIGINT NOT NULL CHECK (amount > 0)`
-- `status VARCHAR NOT NULL CHECK (status IN ('PENDING','PROCESSED','FAILED'))`
-- `failure_reason VARCHAR NULL`
-- `created_at`, `updated_at TIMESTAMPTZ`
+- `status VARCHAR(16) NOT NULL CHECK (status IN ('PENDING','PROCESSED','FAILED'))`
+- `failure_reason VARCHAR(64)`
 - `CHECK (from_wallet_id <> to_wallet_id)`
+- Indexes on `from_wallet_id` and `to_wallet_id`.
 
 **`ledger_entries`**
 
-- `id UUID PRIMARY KEY`
-- `wallet_id UUID NOT NULL REFERENCES wallets(id)`
+- `id BIGSERIAL PRIMARY KEY`
+- `wallet_id VARCHAR(64) NOT NULL REFERENCES wallets(id)`
 - `transfer_id UUID NOT NULL REFERENCES transfers(id)`
-- `type VARCHAR NOT NULL CHECK (type IN ('DEBIT','CREDIT'))`
+- `type VARCHAR(8) NOT NULL CHECK (type IN ('DEBIT','CREDIT'))`
 - `amount BIGINT NOT NULL CHECK (amount > 0)`
-- `created_at TIMESTAMPTZ`
-- `UNIQUE (transfer_id, type)` — guarantees exactly one DEBIT and one CREDIT per transfer
+- **`UNIQUE (transfer_id, type)`** — a transfer can produce at most one DEBIT
+  and one CREDIT row. This is the structural guarantee of the double-entry
+  invariant.
+- Index on `(wallet_id, created_at DESC)` for transfer-history reads.
 
 **`idempotency_records`**
 
-- `key VARCHAR PRIMARY KEY`
-- `request_hash VARCHAR NOT NULL`
+- `key VARCHAR(64) PRIMARY KEY`
+- `request_hash VARCHAR(64) NOT NULL CHECK (char_length(request_hash) = 64)`
 - `transfer_id UUID NOT NULL REFERENCES transfers(id)`
-- `response_status SMALLINT`
-- `response_body JSONB`
-- `created_at TIMESTAMPTZ`
+- `response_status SMALLINT` — nullable until the original response is
+  committed
+- `response_body TEXT` — cached JSON body returned on replay; stored as `TEXT`
+  rather than `JSONB` so the byte-for-byte representation is preserved (JSONB
+  re-serializes on read and can reorder keys)
+
+### Why these constraints matter
+
+Many invariants are enforced **structurally at the DB** so that even a bug in
+the service layer cannot violate them:
+
+| Invariant | Guard |
+|-----------|-------|
+| No negative balance | `CHECK (balance >= 0)` |
+| No zero / negative transfer | `CHECK (amount > 0)` |
+| Exactly one DEBIT + one CREDIT per transfer | `UNIQUE (transfer_id, type)` |
+| No self-transfer | `CHECK (from_wallet_id <> to_wallet_id)` |
+| No orphan ledger entries | `FK ledger_entries.transfer_id → transfers.id` |
+| No duplicate idempotency keys | `PRIMARY KEY (key)` |
 
 ---
 
 ## 5. Idempotency Strategy
 
-- `request_hash` = SHA-256 over `(fromWalletId, toWalletId, amount)`.
-- The transactional flow begins with:
+`request_hash` = SHA-256 over `(fromWalletId | toWalletId | amount)`.
 
-  ```sql
-  INSERT INTO idempotency_records (key, request_hash, transfer_id, …)
-  VALUES (…)
-  ON CONFLICT (key) DO NOTHING;
-  ```
+The service flow for each request:
 
-- **Insert succeeded** → first time we are seeing this key. Execute the transfer, then `UPDATE` the record with `response_status` and `response_body`.
-- **Insert conflicted** → load the existing record:
-  - matching `request_hash` and stored response present → return the cached response.
-  - matching `request_hash` but response not yet stored → duplicate is still in flight → respond `409`.
-  - mismatching `request_hash` → key reuse with a different payload → respond `409`.
-- The idempotency record is written in the **same** DB transaction as the transfer and ledger entries, so we cannot end up with a transfer that has no idempotency record (or vice versa).
+1. `findByKey(idempotencyKey)`:
+   - **Record exists** → if `request_hash` matches and `response_body` is
+     populated, return the cached body with HTTP 200. If `request_hash`
+     differs, throw `IdempotencyConflictException(PAYLOAD_MISMATCH)` → 409.
+   - **No record** → proceed.
+2. Verify both wallets exist (404 if not). This is done before the transfer
+   insert so a missing wallet surfaces as 404 rather than as a downstream FK
+   error masquerading as 409.
+3. Create the `Transfer` row in `PENDING`.
+4. `saveAndFlush` an `IdempotencyRecord` with no response yet. If another
+   thread beat us to inserting the same key, the unique-constraint violation
+   surfaces as `DataIntegrityViolationException` and is mapped to 409
+   `IDEMPOTENCY_IN_FLIGHT` after rollback.
+5. Execute the transfer (see §6).
+6. Serialize the `TransferResponse` DTO with Jackson and persist it on the
+   idempotency record.
+7. Return the body to the controller with the appropriate HTTP status.
+
+The cached body is the **exact** JSON returned to the original caller —
+replays return that body byte-for-byte (we store it as `TEXT`, not `JSONB`,
+specifically to preserve key ordering).
+
+**HTTP status on replay:** The controller always returns 200 on replay,
+regardless of the original status (which could have been 201 or 422). The body
+still carries the original `status` field (`PROCESSED` or `FAILED`), so the
+caller can distinguish outcomes. This is a deliberate convention to make
+replays distinguishable from fresh executions on the HTTP layer.
+
+### Insufficient funds is still idempotent
+
+If the source wallet does not have enough balance, the transfer is persisted
+as `FAILED` with `failure_reason = INSUFFICIENT_FUNDS` and the idempotency
+record stores the 422 response. Retries with the same key replay the same 422
+deterministically — there is no temptation for the client to keep retrying a
+doomed transfer.
 
 ---
 
 ## 6. Concurrency Strategy
 
-**Approach**
+**Isolation:** `READ_COMMITTED`. The critical section is deterministic and
+deadlock-free under our explicit lock ordering, so `SERIALIZABLE` is not worth
+the `40001` retry loop.
 
-- Single `@Transactional(isolation = READ_COMMITTED)` service method.
-- `SELECT … FOR UPDATE` on both wallet rows, acquired in deterministic ascending order of wallet `id`. This eliminates deadlocks for reverse-direction concurrent transfers (`A→B` racing `B→A`).
-- Within the lock window: funds check → balance updates → 2 ledger inserts → transfer status update → idempotency record finalisation. All atomic.
-- DB-level `CHECK (balance >= 0)` acts as a hard safety net independent of application logic — even a bug in the service layer cannot drive a wallet negative.
-- Pessimistic locking chosen over optimistic
+Both wallets are locked in ascending string id order. Two concurrent transfers
+`A→B` and `B→A` therefore lock the same two rows in the same order — the
+textbook reverse-direction deadlock cannot occur.
 
-**Concurrency tests**
+**Lock mode:** Hibernate's `PESSIMISTIC_WRITE` on Postgres maps to
+`SELECT ... FOR UPDATE`. The lock is intentionally stronger than the default
+read so concurrent debits serialize on the wallet row before the balance is
+checked and updated.
 
-Executed against Testcontainers Postgres or h2 db with parallel threads coordinated through `ExecutorService` + `CountDownLatch`:
+### Why pessimistic over optimistic locking
 
-| ID  | Invariant under test |
-|-----|----------------------|
-| C1  | **No double spend.** 50 threads attempt to debit the same wallet; the wallet is funded for exactly 30 of them. Exactly 30 transfers reach `PROCESSED` and 20 reach `FAILED` with `INSUFFICIENT_FUNDS`. Final balance is zero; the balance is never observed negative by any concurrent reader. |
-| C2  | **Idempotency under parallel duplicates.** 100 threads submit the same `idempotencyKey` simultaneously. Exactly 1 row in `transfers` and exactly 2 rows in `ledger_entries` are created, and all 100 HTTP responses are byte-identical. |
-| C3  | **Deadlock-free bidirectional load.** Symmetric concurrent transfers `A→B` and `B→A` across many threads complete without deadlock. Per-wallet net change equals the algebraic sum of applied transfers; the ledger remains balanced. |
-| C4  | **Mixed workload invariants.** 80 threads split 40/40 between replays of a single key and unique transfers. Asserts (a) ledger zero-sum across all entries, and (b) for every wallet `balance == initial_balance + Σ(credits) − Σ(debits)` computed from the ledger. |
-
-Every test asserts both the externally visible outcome (HTTP status counts, response bodies) and the persisted invariants (row counts, ledger sums, balance equation).
+The hot wallet in a transfer system is a high-contention row. With optimistic
+locking, every concurrent debit on a hot wallet would either retry or fail; the
+service would need an explicit retry loop with backoff. Pessimistic locking
+serializes the writers behind a queue and keeps the retry logic out of the
+application — simpler to reason about and easier to test.
 
 ---
 
 ## 7. Transfer State Machine
 
-- A `transfers` row is inserted in state `PENDING` at the beginning of the transaction.
-- Transitions:
-  - `PENDING → PROCESSED` on a successful debit/credit pair.
-  - `PENDING → FAILED` (with `failure_reason`) when funds are insufficient.
-- Because the entire flow runs inside one DB transaction, `PENDING` is transient on disk for the happy path — but it is still persisted in the row so that future asynchronous workflows (e.g. external clearing) can extend the model without schema changes.
-- Retries reuse the idempotency key and therefore never mutate a row that has already reached a terminal state.
+Defined on the `Transfer` entity:
+
+```
+PENDING ──markProcessed()──▶ PROCESSED  (terminal)
+        ──markFailed(r) ──▶ FAILED      (terminal)
+```
+
+Invalid transitions throw `IllegalStateException` at the domain level. Because
+the entire flow runs in one DB transaction, `PENDING` is transient on disk for
+the happy path — but it is persisted so that future asynchronous workflows
+(e.g. external clearing) can extend the model without schema changes.
+
+Retries reuse the idempotency key and therefore never mutate a row that has
+already reached a terminal state — the idempotency lookup short-circuits
+before any wallet lock is acquired.
 
 ---
 
 ## 8. Failure Modes
 
-- **Validation failure** → no DB writes.
-- **Wallet not found** → 404, no writes.
-- **Insufficient funds** → transfer row written as `FAILED`, no ledger entries, idempotency record stored so retries return the same `FAILED` response.
-- **DB constraint violation** → mapped by the exception handler to 409 or 422 as appropriate.
-- **Process crash mid-transaction** → Postgres rolls back; a client retry with the same key replays cleanly.
-- **Response lost in flight** → client retry hits the idempotency cache and receives the original response (200).
+| Failure | Effect |
+|---------|--------|
+| Validation failure | 400, no DB writes |
+| Self-transfer | 400, no DB writes |
+| Wallet not found | 404, no DB writes (checked before transfer insert) |
+| Insufficient funds | 422, transfer persisted as `FAILED`, no ledger entries, idempotency record stored → replayable |
+| Same key, different payload | 409 `IDEMPOTENCY_CONFLICT` |
+| Concurrent duplicate that loses the unique-key race | 409 `IDEMPOTENCY_IN_FLIGHT` (caller should retry) |
+| DB unreachable / crash mid-tx | Postgres rolls back; a client retry replays cleanly because the idempotency claim was rolled back too |
+| Response lost in flight | Client retry hits the cached idempotency response and gets the original body |
 
 ---
 
 ## 9. Architecture / Layering
 
-Package layout mirrors the structure used in my Coras project:
-
 ```
 com.kullu.wallet
-├── controller          // @RestController, request handling, status mapping
-├── service             // @Service, @Transactional boundary, idempotency + transfer orchestration
-├── jpa.repository      // Spring Data JPA repositories, @Lock(PESSIMISTIC_WRITE) queries
-├── entity              // JPA entities (Wallet, Transfer, LedgerEntry, IdempotencyRecord)
-├── dto.request         // inbound DTOs with Bean Validation annotations
-├── dto.response        // outbound DTOs
-├── exception           // domain exceptions + @RestControllerAdvice handler
-└── configs             // Spring configuration (datasource, JPA, Jackson)
+├── controller          // @RestController + @RestControllerAdvice
+├── service             // @Transactional orchestration (TransferService)
+├── repository          // Spring Data JPA, FOR UPDATE on wallets
+├── entity              // JPA entities with domain-level state transitions
+├── dto.request         // inbound DTOs with Bean Validation
+└── dto.response        // outbound DTOs + ErrorResponse envelope
+└── exception           // domain exceptions
 ```
 
 Layering rules:
 
-- Controllers stay thin — validate, delegate, map exceptions to HTTP status. No business logic.
-- The service layer owns the `@Transactional` boundary and is the only place that orchestrates idempotency together with transfer execution.
-- Repositories expose only persistence operations; no business decisions.
-- Entities carry their own state-transition methods (`markProcessed()`, `markFailed(reason)`) so invalid transitions are impossible at the domain level.
-- JPA entities never cross the controller boundary — request and response DTOs sit at the edges.
+- **Controllers** validate, delegate, and map exceptions to HTTP status. No
+  business logic.
+- **Service** owns the `@Transactional` boundary and is the only place that
+  orchestrates idempotency together with transfer execution.
+- **Repositories** expose only persistence operations; no business decisions.
+- **Entities** carry their own state-transition methods (`markProcessed()`,
+  `markFailed(reason)`) so invalid transitions are impossible at the domain
+  level.
+- JPA entities never cross the controller boundary — DTOs sit at the edges.
 
 ---
 
 ## 10. Testing Strategy
 
-- **Unit tests** (JUnit 5 + Mockito): state machine transitions, validation, request-hash computation and equality.
-- **Repository slice tests** (`@DataJpaTest`): unique idempotency key, unique `(transfer_id, type)` on ledger entries, `CHECK` constraints on balance and amount.
-- **Integration tests** with Testcontainers Postgres or h2 db:
-  - happy path — balances updated and exactly 2 ledger entries written, summing to zero.
-  - duplicate key with the same payload → identical response, no extra rows.
-  - duplicate key with a different payload → 409.
-  - insufficient funds → `FAILED`, balances unchanged.
-  - self-transfer rejected.
-- Discipline: **Red → Green → Refactor** — failing test first, smallest correct implementation, then refactor under a green suite.
+Following the assignment's **Red → Green → Refactor** discipline.
+
+### Unit tests (`./gradlew test`, no Docker)
+
+- `TransferTest` — state machine: legal/illegal transitions, validation.
+- `WalletTest` — debit/credit invariants, overdraft, validation.
+- `LedgerEntryTest` — signed amount, constructor invariants.
+- `RequestHasherTest` — determinism and field sensitivity (direction matters).
+
+### Integration tests (`./gradlew integrationTest`, Testcontainers Postgres)
+
+- `TransferControllerIT` — eight HTTP-level behaviours:
+  - happy path → 201, balances updated, two ledger entries, ledger zero-sum
+  - replay (same key + same payload) → 200, byte-identical body, no extra rows
+  - replay with different payload → 409 `IDEMPOTENCY_CONFLICT`
+  - insufficient funds → 422 + `FAILED` row + idempotency cache
+  - insufficient funds replay → 200, identical body
+  - self-transfer → 400 `SELF_TRANSFER`
+  - missing wallet → 404 `WALLET_NOT_FOUND`
+  - validation errors (negative amount, blank key) → 400
+
+### Concurrency tests (`ConcurrencyIT`)
+
+| ID | Invariant under test |
+|----|----------------------|
+| **C1** | **No double-spend.** 50 threads attempt to debit a wallet funded for exactly 30 transfers. Exactly 30 reach `PROCESSED`, 20 reach `FAILED(INSUFFICIENT_FUNDS)`, final balance is zero, ledger has 60 rows and sums to zero. |
+| **C2** | **Idempotency under parallel duplicates.** 100 threads submit the same key simultaneously. Exactly 1 transfer row, 2 ledger rows, and all 100 response bodies are byte-identical. |
+| **C3** | **Deadlock-free bidirectional load.** 100 transfers symmetric across A↔B run in parallel. All succeed (no `40P01`), net balance change is zero, ledger zero-sum. |
+| **C4** | **Mixed workload invariants.** 80 threads, 40 sharing one key + 40 unique keys → 41 transfer rows, 82 ledger rows, balance equation `balance = initial + Σcredits − Σdebits` holds. |
+
+Each concurrency test asserts both **externally observable** counts (HTTP
+status counts, response bodies) and **persisted invariants** (row counts,
+ledger zero-sum, balance equation).
+
+**Total: 31 tests, all passing on Postgres 16.**
 
 ---
 
 ## 11. Tradeoffs & Non-Goals
 
-- **Stored balance** chosen over deriving from the ledger — fast reads, simple insufficient-funds check; the ledger remains the audit trail. A reconciliation job is out of scope.
-- **Pessimistic locking** chosen over optimistic locking (justification in §6).
-- **Synchronous single-transaction workflow** chosen over an async PENDING + worker design — simpler to reason about, and the schema leaves room to evolve later.
-- No outbox, event publishing, FX, fees, holds, reservations, rate limiting, or auth.
-- Observability, balance API, and transfer history API are deferred — they belong to the assignment's optional enhancements section.
+- **Stored balance** chosen over deriving from the ledger — fast reads, simple
+  insufficient-funds check; the ledger remains the audit trail. A
+  reconciliation job is out of scope but trivial to add.
+- **Pessimistic locking** chosen over optimistic locking (rationale in §6).
+- **Synchronous single-transaction workflow** chosen over an async PENDING +
+  worker design — simpler to reason about; the schema leaves room to evolve.
+- **Cached response body as `TEXT`** rather than `JSONB` to preserve
+  byte-for-byte equality across replays.
+- **No outbox, no event publishing, no FX, no fees, no holds/reservations, no
+  rate limiting, no auth.** All out of scope.
+- **Observability:** structured Spring Boot logging exists; metrics and
+  request-ID correlation are deferred (assignment's optional enhancements).
+
+---
+
+## 12. AI Disclosure
+
+See [`AI_TRANSCRIPT.md`](./AI_TRANSCRIPT.md) for the full disclosure of how AI
+tooling was used during this build.

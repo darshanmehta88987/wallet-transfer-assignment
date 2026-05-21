@@ -1,0 +1,25 @@
+package com.kullu.wallet.repository;
+
+import com.kullu.wallet.entity.IdempotencyRecord;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+
+import java.util.Optional;
+import java.util.UUID;
+
+public interface IdempotencyRecordRepository extends JpaRepository<IdempotencyRecord, String> {
+
+    Optional<IdempotencyRecord> findByKey(String key);
+
+    @Modifying(clearAutomatically = true)
+    @Query(value = """
+        INSERT INTO idempotency_records (key, request_hash, transfer_id, created_at, updated_at)
+        VALUES (:key, :hash, :transferId, NOW(), NOW())
+        ON CONFLICT (key) DO NOTHING
+        """, nativeQuery = true)
+    int tryClaim(@Param("key") String key,
+                 @Param("hash") String hash,
+                 @Param("transferId") UUID transferId);
+}
