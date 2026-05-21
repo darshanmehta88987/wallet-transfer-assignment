@@ -2,7 +2,7 @@
 --
 -- Design notes:
 --  * Amounts use BIGINT minor units (e.g. paise/cents) to avoid float rounding.
---  * Single currency. No Multi currenct in scope.
+--  * Single currency. Multi-currency is out of scope.
 --  * CHECK (balance >= 0) is the structural guarantee against double-spend even
 --    if application logic is buggy.
 --  * UNIQUE (transfer_id, type) on ledger_entries guarantees exactly one DEBIT
@@ -53,3 +53,11 @@ CREATE TABLE idempotency_records (
     updated_at       TIMESTAMPTZ  NOT NULL DEFAULT NOW()
 );
 CREATE INDEX idx_idempotency_transfer ON idempotency_records(transfer_id);
+
+-- ── Seed data ────────────────────────────────────────────────────────────────
+-- Two wallets so that a fresh `docker compose up` is immediately usable
+-- against the sample requests documented in the README. wallet_1 holds an
+-- initial balance; wallet_2 starts empty.
+INSERT INTO wallets (id, balance) VALUES
+    ('wallet_1', 10000),
+    ('wallet_2', 0);

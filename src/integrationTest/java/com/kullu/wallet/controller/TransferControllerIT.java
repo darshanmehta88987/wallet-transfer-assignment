@@ -60,7 +60,7 @@ class TransferControllerIT extends AbstractPostgresIntegrationTest {
     }
 
     @Test
-    void happyPath_createsTransferAndUpdatesBalances() throws Exception {
+    void happyPathCreatesTransferAndUpdatesBalances() throws Exception {
         String key = "k-happy";
         MvcResult res = mockMvc.perform(post("/transfers")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -86,7 +86,7 @@ class TransferControllerIT extends AbstractPostgresIntegrationTest {
     }
 
     @Test
-    void replay_sameKeySamePayload_returns200WithIdenticalBody() throws Exception {
+    void replaySameKeySamePayloadReturns200WithIdenticalBody() throws Exception {
         String key = "k-replay";
         CreateTransferRequest req = new CreateTransferRequest(key, from, to, 150L);
 
@@ -114,7 +114,7 @@ class TransferControllerIT extends AbstractPostgresIntegrationTest {
     }
 
     @Test
-    void replay_sameKeyDifferentPayload_returns409Conflict() throws Exception {
+    void replaySameKeyDifferentPayloadReturns409Conflict() throws Exception {
         String key = "k-conflict";
         mockMvc.perform(post("/transfers")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -129,7 +129,7 @@ class TransferControllerIT extends AbstractPostgresIntegrationTest {
     }
 
     @Test
-    void insufficientFunds_persistsFailedAndReturns422() throws Exception {
+    void insufficientFundsPersistsFailedAndReturns422() throws Exception {
         mockMvc.perform(post("/transfers")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(json(new CreateTransferRequest("k-poor", from, to, 5_000L))))
@@ -150,7 +150,7 @@ class TransferControllerIT extends AbstractPostgresIntegrationTest {
     }
 
     @Test
-    void insufficientFunds_isReplayable() throws Exception {
+    void insufficientFundsIsReplayable() throws Exception {
         CreateTransferRequest req = new CreateTransferRequest("k-poor-replay", from, to, 5_000L);
 
         MvcResult first = mockMvc.perform(post("/transfers")
@@ -170,7 +170,7 @@ class TransferControllerIT extends AbstractPostgresIntegrationTest {
     }
 
     @Test
-    void selfTransfer_returns400() throws Exception {
+    void selfTransferReturns400() throws Exception {
         mockMvc.perform(post("/transfers")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(json(new CreateTransferRequest("k-self", from, from, 100L))))
@@ -179,7 +179,7 @@ class TransferControllerIT extends AbstractPostgresIntegrationTest {
     }
 
     @Test
-    void walletNotFound_returns404() throws Exception {
+    void walletNotFoundReturns404() throws Exception {
         String missing = "missing-wallet";
         mockMvc.perform(post("/transfers")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -189,7 +189,7 @@ class TransferControllerIT extends AbstractPostgresIntegrationTest {
     }
 
     @Test
-    void validationErrors_returns400() throws Exception {
+    void validationErrorsReturns400() throws Exception {
         // negative amount
         mockMvc.perform(post("/transfers")
                 .contentType(MediaType.APPLICATION_JSON)

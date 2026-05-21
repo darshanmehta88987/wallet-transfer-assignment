@@ -55,7 +55,7 @@ class ConcurrencyIT extends AbstractPostgresIntegrationTest {
      */
     @Test
     @Timeout(value = 60, unit = TimeUnit.SECONDS)
-    void c1_doubleSpendIsImpossible() throws Exception {
+    void c1DoubleSpendIsImpossible() throws Exception {
         long amount = 100;
         int succeed = 30;
         int total = 50;
@@ -91,7 +91,7 @@ class ConcurrencyIT extends AbstractPostgresIntegrationTest {
      */
     @Test
     @Timeout(value = 60, unit = TimeUnit.SECONDS)
-    void c2_concurrentDuplicatesCollapseToOneTransfer() throws Exception {
+    void c2ConcurrentDuplicatesCollapseToOneTransfer() throws Exception {
         long amount = 50;
         String from = seedWallet(walletRepo, 10_000);
         String to = seedWallet(walletRepo, 0);
@@ -135,7 +135,7 @@ class ConcurrencyIT extends AbstractPostgresIntegrationTest {
      */
     @Test
     @Timeout(value = 60, unit = TimeUnit.SECONDS)
-    void c3_reverseDirectionTransfersAreDeadlockFree() throws Exception {
+    void c3ReverseDirectionTransfersAreDeadlockFree() throws Exception {
         long amount = 10;
         String a = seedWallet(walletRepo, 10_000);
         String b = seedWallet(walletRepo, 10_000);
@@ -171,7 +171,7 @@ class ConcurrencyIT extends AbstractPostgresIntegrationTest {
      */
     @Test
     @Timeout(value = 90, unit = TimeUnit.SECONDS)
-    void c4_mixedWorkloadInvariants() throws Exception {
+    void c4MixedWorkloadInvariants() throws Exception {
         long amount = 1;
         String from = seedWallet(walletRepo, 1_000);
         String to = seedWallet(walletRepo, 0);

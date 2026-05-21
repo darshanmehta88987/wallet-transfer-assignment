@@ -20,6 +20,13 @@ public class TransferController {
         this.transferService = transferService;
     }
 
+    /**
+     * The body is intentionally returned as a raw {@link String} rather than a
+     * typed DTO: on idempotent replay we return the exact bytes that were
+     * cached on the first execution. Re-serialising through a DTO here would
+     * risk Jackson reordering keys and breaking byte-for-byte equality between
+     * the original response and replays.
+     */
     @PostMapping
     public ResponseEntity<String> create(@Valid @RequestBody final CreateTransferRequest request) {
         TransferOutcome outcome = transferService.createTransfer(request);
