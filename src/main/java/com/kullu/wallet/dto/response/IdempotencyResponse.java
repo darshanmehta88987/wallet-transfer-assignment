@@ -1,6 +1,6 @@
 package com.kullu.wallet.dto.response;
 
-import com.kullu.wallet.entity.IdempotencyRecord;
+import com.kullu.wallet.entity.IdempotencyEntity;
 
 public record IdempotencyResponse(
     String requestHash,
@@ -14,11 +14,11 @@ public record IdempotencyResponse(
         }
     }
 
-    public IdempotencyResponse(final IdempotencyRecord idempotencyRecord) {
+    public IdempotencyResponse(final IdempotencyEntity idempotencyEntity) {
         this(
-                idempotencyRecord.getRequestHash(),
-                idempotencyRecord.getResponseStatus(),
-                idempotencyRecord.getResponseBody()
+                idempotencyEntity.getRequestHash(),
+                idempotencyEntity.getResponseStatus(),
+                idempotencyEntity.getResponseBody()
         );
     }
 

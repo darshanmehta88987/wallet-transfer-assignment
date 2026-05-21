@@ -6,7 +6,7 @@ import java.util.UUID;
 import org.springframework.stereotype.Service;
 
 import com.kullu.wallet.dto.response.IdempotencyResponse;
-import com.kullu.wallet.entity.IdempotencyRecord;
+import com.kullu.wallet.entity.IdempotencyEntity;
 import com.kullu.wallet.repository.IdempotencyRecordRepository;
 
 
@@ -35,14 +35,14 @@ public class IdempotencyService {
     }
 
     public void storeResponse(final String key, final short status, final String body) {
-        IdempotencyRecord idempotencyRecord = idempotency.findByKey(key)
+        IdempotencyEntity idempotencyEntity = idempotency.findByKey(key)
                 .orElseThrow(() -> new IllegalStateException(
                         "idempotency record should exist before storing response"));
-        idempotencyRecord.storeResponse(status, body);
-        idempotency.save(idempotencyRecord);
+        idempotencyEntity.storeResponse(status, body);
+        idempotency.save(idempotencyEntity);
     }
 
-    private IdempotencyResponse toCachedResponse(final IdempotencyRecord idempotencyRecord) {
-        return new IdempotencyResponse(idempotencyRecord);
+    private IdempotencyResponse toCachedResponse(final IdempotencyEntity idempotencyEntity) {
+        return new IdempotencyResponse(idempotencyEntity);
     }
 }

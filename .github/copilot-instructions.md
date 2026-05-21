@@ -1,13 +1,13 @@
 # Copilot Review Instructions
 
-Review pull requests in this repository as if you are a senior backend engineer evaluating a coding assignment for a wallet transfer service.
+Review pull requests in this repository as if you are a senior backend engineer evaluating a coding assignment for a walletEntity transferEntity service.
 
 Focus on:
 
 - correctness before cleverness
 - transactional safety
 - idempotency guarantees
-- concurrency handling for debits on the same wallet
+- concurrency handling for debits on the same walletEntity
 - exactly-once semantics at the API level
 - ledger consistency and double-entry correctness
 - clean separation between handler, service, repository, and model layers

@@ -2,7 +2,7 @@
 
 ## Overview
 
-Build a small service that supports **wallet-to-wallet transfers**.
+Build a small service that supports **walletEntity-to-walletEntity transfers**.
 
 The goal of this assignment is to evaluate your ability to design a **reliable transactional system** with correct handling of:
 
@@ -27,7 +27,7 @@ Focus on **clarity, correctness, and robustness**, not feature completeness.
 
 ## Problem Statement
 
-Implement a service that supports **wallet transfers**.
+Implement a service that supports **walletEntity transfers**.
 
 Transfers must guarantee:
 
@@ -69,7 +69,7 @@ Example request:
 
 ### 2. Wallet Balances
 
-The system must maintain **wallet balances**.
+The system must maintain **walletEntity balances**.
 
 You may choose either:
 
@@ -80,7 +80,7 @@ Your design must guarantee **correct balances under concurrent requests**.
 
 ### 3. Double-Entry Ledger
 
-Every transfer must produce **two ledger entries**.
+Every transferEntity must produce **two ledger entries**.
 
 | entry_id | wallet_id | transfer_id | type   | amount |
 |----------|-----------|-------------|--------|--------|
@@ -89,9 +89,9 @@ Every transfer must produce **two ledger entries**.
 
 Rules:
 
-- every transfer must generate exactly two entries
-- debit from source wallet
-- credit to destination wallet
+- every transferEntity must generate exactly two entries
+- debit from source walletEntity
+- credit to destination walletEntity
 - ledger must always balance
 
 ### 4. Transfer States
@@ -122,7 +122,7 @@ Your implementation must safely handle concurrent scenarios.
 Example case:
 
 ```text
-Two transfers attempt to debit the same wallet simultaneously
+Two transfers attempt to debit the same walletEntity simultaneously
 ```
 
 The system must ensure:
@@ -191,7 +191,7 @@ Responsibilities should be clearly separated:
 - business logic
 - orchestration
 - idempotency behavior
-- transfer workflow
+- transferEntity workflow
 
 **Repository**
 
@@ -280,7 +280,7 @@ Testing is required.
 
 Your solution should include tests for:
 
-- transfer execution
+- transferEntity execution
 - idempotency behavior
 - ledger correctness
 - failure scenarios
@@ -337,7 +337,7 @@ Your submission will be evaluated on:
 A strong submission typically includes:
 
 - clear database schema
-- safe transactional transfer logic
+- safe transactional transferEntity logic
 - explicit idempotency handling
 - readable code
 - thoughtful tests
@@ -387,8 +387,8 @@ We will have a short discussion on your PR and you should be able to to explain 
 
 If time permits, you may also include:
 
-- wallet balance API
-- transfer history API
+- walletEntity balance API
+- transferEntity history API
 - observability/logging
 - metrics
 - retry-safe workflows

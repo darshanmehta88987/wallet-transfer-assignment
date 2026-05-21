@@ -2,6 +2,7 @@ package com.kullu.wallet.controller;
 
 import jakarta.validation.Valid;
 
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -28,11 +29,20 @@ public class TransferController {
      * cached on the first execution. Re-serialising through a DTO here would
      * risk Jackson reordering keys and breaking byte-for-byte equality between
      * the original response and replays.
+     *
+     * <p>Because the return type is {@code String}, Spring's
+     * {@code StringHttpMessageConverter} would otherwise default the
+     * {@code Content-Type} response header to {@code text/plain}. We
+     * therefore declare {@code produces = application/json} on the mapping
+     * and set the {@code Content-Type} explicitly on every response so
+     * content-negotiating clients see a correctly-typed JSON body.
      */
-    @PostMapping
+    @PostMapping(produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<String> create(@Valid @RequestBody final CreateTransferRequest request) {
         TransferOutcome outcome = transferService.createTransfer(request);
         int responseStatus = outcome.isReplayed() ? 200 : outcome.getStatus();
-        return ResponseEntity.status(responseStatus).body(outcome.getResponseBody());
+        return ResponseEntity.status(responseStatus)
+            .contentType(MediaType.APPLICATION_JSON)
+            .body(outcome.getResponseBody());
     }
 }

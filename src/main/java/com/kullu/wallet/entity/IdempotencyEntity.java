@@ -22,7 +22,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Entity
 @Table(name = "idempotency_records")
-public class IdempotencyRecord {
+public class IdempotencyEntity {
 
     @Id
     @Column(name = "key", nullable = false, updatable = false, length = 64)
@@ -48,7 +48,7 @@ public class IdempotencyRecord {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
-    public IdempotencyRecord(final String key, final String requestHash, final UUID transferId) {
+    public IdempotencyEntity(final String key, final String requestHash, final UUID transferId) {
         if (key == null || key.isBlank()) {
             throw new IllegalArgumentException("key must not be blank");
         }

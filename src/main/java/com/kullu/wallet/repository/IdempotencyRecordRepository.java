@@ -8,11 +8,11 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-import com.kullu.wallet.entity.IdempotencyRecord;
+import com.kullu.wallet.entity.IdempotencyEntity;
 
-public interface IdempotencyRecordRepository extends JpaRepository<IdempotencyRecord, String> {
+public interface IdempotencyRecordRepository extends JpaRepository<IdempotencyEntity, String> {
 
-    Optional<IdempotencyRecord> findByKey(String key);
+    Optional<IdempotencyEntity> findByKey(String key);
 
     @Modifying(clearAutomatically = true)
     @Query(value = """

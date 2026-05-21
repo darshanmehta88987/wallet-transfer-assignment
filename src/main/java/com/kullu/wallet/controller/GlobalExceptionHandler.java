@@ -13,7 +13,6 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import com.kullu.wallet.dto.response.ErrorResponse;
 import com.kullu.wallet.exception.IdempotencyConflictException;
-import com.kullu.wallet.exception.InsufficientFundsException;
 import com.kullu.wallet.exception.SelfTransferException;
 import com.kullu.wallet.exception.WalletNotFoundException;
 
@@ -47,12 +46,6 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> onWalletNotFound(WalletNotFoundException ex) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
             .body(new ErrorResponse("WALLET_NOT_FOUND", ex.getMessage()));
-    }
-
-    @ExceptionHandler(InsufficientFundsException.class)
-    public ResponseEntity<ErrorResponse> onInsufficientFunds(InsufficientFundsException ex) {
-        return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY)
-            .body(new ErrorResponse("INSUFFICIENT_FUNDS", ex.getMessage()));
     }
 
     @ExceptionHandler(IdempotencyConflictException.class)

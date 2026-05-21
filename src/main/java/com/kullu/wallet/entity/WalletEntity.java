@@ -21,7 +21,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Entity
 @Table(name = "wallets")
-public class Wallet {
+public class WalletEntity {
 
     @Id
     @Column(name = "id", nullable = false, updatable = false)
@@ -38,7 +38,7 @@ public class Wallet {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
-    public Wallet(final String id, final long balance) {
+    public WalletEntity(final String id, final long balance) {
         if (id == null || id.isBlank()) {
             throw new IllegalArgumentException("wallet id must not be blank");
         }

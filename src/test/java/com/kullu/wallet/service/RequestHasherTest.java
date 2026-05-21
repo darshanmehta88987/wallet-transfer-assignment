@@ -34,4 +34,20 @@ class RequestHasherTest {
         assertThat(RequestHasher.hash(a, b, 100))
             .isNotEqualTo(RequestHasher.hash(b, a, 100));
     }
+
+    /**
+     * Regression test for the delimiter-injection collision flagged in PR #38.
+     * A naive {@code from + "|" + to} canonicalisation would hash
+     * {@code ("a|b", "c", 100)} identically to {@code ("a", "b|c", 100)}.
+     * Length-prefixed framing must keep these distinct.
+     */
+    @Test
+    void delimiterInjectionCannotForgeCollision() {
+        assertThat(RequestHasher.hash("a|b", "c", 100))
+            .isNotEqualTo(RequestHasher.hash("a", "b|c", 100));
+        // Also guard against amount-side collisions
+        // ("100" appended to "from|to" vs "100" as its own field).
+        assertThat(RequestHasher.hash("from", "to|100", 0))
+            .isNotEqualTo(RequestHasher.hash("from", "to", 100));
+    }
 }

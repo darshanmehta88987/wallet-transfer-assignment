@@ -18,7 +18,6 @@ import com.kullu.wallet.dto.request.CreateTransferRequest;
 import com.kullu.wallet.dto.response.TransferOutcome;
 import com.kullu.wallet.entity.LedgerEntry;
 import com.kullu.wallet.exception.IdempotencyConflictException;
-import com.kullu.wallet.exception.InsufficientFundsException;
 import com.kullu.wallet.repository.IdempotencyRecordRepository;
 import com.kullu.wallet.repository.LedgerEntryRepository;
 import com.kullu.wallet.repository.TransferRepository;
@@ -224,8 +223,6 @@ class ConcurrencyIT extends AbstractPostgresIntegrationTest {
                 try {
                     start.await();
                     task.run(idx);
-                } catch (InsufficientFundsException ignored) {
-                    // Expected outcome in some scenarios; not an error.
                 } catch (Throwable t) {
                     errors.add(t);
                 } finally {
@@ -258,11 +255,13 @@ class ConcurrencyIT extends AbstractPostgresIntegrationTest {
         List<LedgerEntry> entries = ledgerRepo.findAllByWalletIdOrderByCreatedAtDesc(walletId);
         long net = entries.stream().mapToLong(LedgerEntry::signedAmount).sum();
         long stored = walletRepo.findById(walletId).orElseThrow().getBalance();
-        // Initial balance must equal stored − net (since stored = initial + net).
-        // We don't track initial separately here, so we just assert that the
-        // stored balance is consistent with the ledger net for this wallet.
-        assertThat(stored - net)
-            .as("balance(%s) − Σledger must equal the initial seeded balance", walletId)
-            .isNotNegative();
+        long initial = initialBalanceOf(walletId);
+        // The double-entry invariant: stored balance must equal the seeded
+        // initial balance plus the net of every ledger entry touching this
+        // wallet. A regression that updated the balance but skipped a ledger
+        // write would leave `stored != initial + net` and fail here.
+        assertThat(stored)
+            .as("balance(%s) must equal initial(%d) + Σledger(%d)", walletId, initial, net)
+            .isEqualTo(initial + net);
     }
 }

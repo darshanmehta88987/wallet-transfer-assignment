@@ -4,7 +4,7 @@ import java.util.Optional;
 
 import org.springframework.stereotype.Service;
 
-import com.kullu.wallet.entity.Wallet;
+import com.kullu.wallet.entity.WalletEntity;
 import com.kullu.wallet.exception.WalletNotFoundException;
 import com.kullu.wallet.repository.WalletRepository;
 
@@ -23,7 +23,7 @@ public class WalletService {
      *
      * @throws WalletNotFoundException if no wallet exists for the given id
      */
-    public Wallet lockAndGet(final String id) {
+    public WalletEntity lockAndGet(final String id) {
         return wallets.lockById(id)
             .orElseThrow(() -> new WalletNotFoundException(id));
     }
@@ -31,11 +31,11 @@ public class WalletService {
     /**
      * Lookup a wallet without locking. Primarily for read-only scenarios.
      */
-    public Optional<Wallet> findById(final String id) {
+    public Optional<WalletEntity> findById(final String id) {
         return wallets.findById(id);
     }
 
-    public Wallet save(final Wallet wallet) {
-        return wallets.save(wallet);
+    public WalletEntity save(final WalletEntity walletEntity) {
+        return wallets.save(walletEntity);
     }
 }

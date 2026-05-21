@@ -4,7 +4,7 @@ import java.util.UUID;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 
-import com.kullu.wallet.entity.Transfer;
+import com.kullu.wallet.entity.TransferEntity;
 
-public interface TransferRepository extends JpaRepository<Transfer, UUID> {
+public interface TransferRepository extends JpaRepository<TransferEntity, UUID> {
 }

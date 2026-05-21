@@ -2,6 +2,7 @@ package com.kullu.wallet.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -28,7 +29,7 @@ import com.kullu.wallet.repository.WalletRepository;
 import com.kullu.wallet.support.AbstractPostgresIntegrationTest;
 
 @AutoConfigureMockMvc
-class TransferControllerIT extends AbstractPostgresIntegrationTest {
+class TransferEntityControllerIT extends AbstractPostgresIntegrationTest {
 
     @Autowired
     private MockMvc mockMvc;
@@ -66,6 +67,7 @@ class TransferControllerIT extends AbstractPostgresIntegrationTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(json(new CreateTransferRequest(key, from, to, 200L))))
             .andExpect(status().isCreated())
+            .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
             .andExpect(jsonPath("$.status").value("PROCESSED"))
             .andExpect(jsonPath("$.amount").value(200))
             .andReturn();

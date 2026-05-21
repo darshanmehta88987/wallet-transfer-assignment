@@ -21,7 +21,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Entity
 @Table(name = "transfers")
-public class Transfer {
+public class TransferEntity {
 
     @Id
     @Column(name = "id", nullable = false, updatable = false)
@@ -51,7 +51,7 @@ public class Transfer {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
-    public Transfer(final UUID id, final String fromWalletId, final String toWalletId, final long amount) {
+    public TransferEntity(final UUID id, final String fromWalletId, final String toWalletId, final long amount) {
         if (id == null || fromWalletId == null || toWalletId == null) {
             throw new IllegalArgumentException("ids must not be null");
         }

@@ -19,8 +19,8 @@ import com.kullu.wallet.dto.response.TransferOutcome;
 import com.kullu.wallet.dto.response.TransferResponse;
 import com.kullu.wallet.entity.EntryType;
 import com.kullu.wallet.entity.LedgerEntry;
-import com.kullu.wallet.entity.Transfer;
-import com.kullu.wallet.entity.Wallet;
+import com.kullu.wallet.entity.TransferEntity;
+import com.kullu.wallet.entity.WalletEntity;
 import com.kullu.wallet.exception.IdempotencyConflictException;
 import com.kullu.wallet.exception.SelfTransferException;
 import com.kullu.wallet.repository.TransferRepository;
@@ -102,11 +102,11 @@ public class TransferService {
 
     private TransferOutcome createNewTransfer(final CreateTransferRequest request, final String requestHash) {
         LockedWallets wallets = lockWallets(request.getFromWalletId(), request.getToWalletId());
-        Transfer transfer = createPendingTransfer(wallets, request.getAmount());
-        claimIdempotencyKey(request.getIdempotencyKey(), requestHash, transfer.getId());
+        TransferEntity transferEntity = createPendingTransfer(wallets, request.getAmount());
+        claimIdempotencyKey(request.getIdempotencyKey(), requestHash, transferEntity.getId());
 
-        executeTransfer(wallets, transfer);
-        return finalizeOutcome(request.getIdempotencyKey(), transfer);
+        executeTransfer(wallets, transferEntity);
+        return finalizeOutcome(request.getIdempotencyKey(), transferEntity);
     }
 
     private LockedWallets lockWallets(final String fromWalletId, final String toWalletId) {
@@ -115,19 +115,19 @@ public class TransferService {
             .sorted(Comparator.naturalOrder())
             .toList();
 
-        Wallet first = walletService.lockAndGet(ordered.get(0));
-        Wallet second = walletService.lockAndGet(ordered.get(1));
+        WalletEntity first = walletService.lockAndGet(ordered.get(0));
+        WalletEntity second = walletService.lockAndGet(ordered.get(1));
 
-        Wallet from = first.getId().equals(fromWalletId) ? first : second;
-        Wallet to = first.getId().equals(toWalletId) ? first : second;
+        WalletEntity from = first.getId().equals(fromWalletId) ? first : second;
+        WalletEntity to = first.getId().equals(toWalletId) ? first : second;
         return new LockedWallets(from, to);
     }
 
-    private Transfer createPendingTransfer(final LockedWallets wallets, final long amount) {
-        Transfer transfer = new Transfer(
+    private TransferEntity createPendingTransfer(final LockedWallets wallets, final long amount) {
+        TransferEntity transferEntity = new TransferEntity(
             UUID.randomUUID(), wallets.from().getId(), wallets.to().getId(), amount);
-        saveTransfer(transfer);
-        return transfer;
+        saveTransfer(transferEntity);
+        return transferEntity;
     }
 
     private void claimIdempotencyKey(final String idempotencyKey,
@@ -143,56 +143,56 @@ public class TransferService {
 
     }
 
-    private void executeTransfer(final LockedWallets wallets, final Transfer transfer) {
-        Wallet from = wallets.from();
-        Wallet to = wallets.to();
+    private void executeTransfer(final LockedWallets wallets, final TransferEntity transferEntity) {
+        WalletEntity from = wallets.from();
+        WalletEntity to = wallets.to();
 
-        if (hasInsufficientFunds(from, transfer)) {
-            transfer.markFailed("INSUFFICIENT_FUNDS");
-            saveTransfer(transfer);
+        if (hasInsufficientFunds(from, transferEntity)) {
+            transferEntity.markFailed("INSUFFICIENT_FUNDS");
+            saveTransfer(transferEntity);
             return;
         }
 
-        applySuccessfulTransfer(from, to, transfer);
+        applySuccessfulTransfer(from, to, transferEntity);
     }
 
-    private boolean hasInsufficientFunds(final Wallet from, final Transfer transfer) {
-        return from.getBalance() < transfer.getAmount();
+    private boolean hasInsufficientFunds(final WalletEntity from, final TransferEntity transferEntity) {
+        return from.getBalance() < transferEntity.getAmount();
     }
 
-    private void applySuccessfulTransfer(final Wallet from, final Wallet to, final Transfer transfer) {
-        from.debit(transfer.getAmount());
-        to.credit(transfer.getAmount());
+    private void applySuccessfulTransfer(final WalletEntity from, final WalletEntity to, final TransferEntity transferEntity) {
+        from.debit(transferEntity.getAmount());
+        to.credit(transferEntity.getAmount());
         walletService.save(from);
         walletService.save(to);
 
         ledgerService.save(new LedgerEntry(
-            from.getId(), transfer.getId(), EntryType.DEBIT, transfer.getAmount()));
+            from.getId(), transferEntity.getId(), EntryType.DEBIT, transferEntity.getAmount()));
         ledgerService.save(new LedgerEntry(
-            to.getId(), transfer.getId(), EntryType.CREDIT, transfer.getAmount()));
+            to.getId(), transferEntity.getId(), EntryType.CREDIT, transferEntity.getAmount()));
 
-        transfer.markProcessed();
-        saveTransfer(transfer);
+        transferEntity.markProcessed();
+        saveTransfer(transferEntity);
     }
 
-    private TransferOutcome finalizeOutcome(final String idempotencyKey, final Transfer transfer) {
+    private TransferOutcome finalizeOutcome(final String idempotencyKey, final TransferEntity transferEntity) {
         TransferResponse response = new TransferResponse(
-            transfer.getId(),
-            transfer.getStatus(),
-            transfer.getFromWalletId(),
-            transfer.getToWalletId(),
-            transfer.getAmount(),
-            transfer.getFailureReason(),
-            transfer.getCreatedAt());
-        short httpStatus = (short) successStatusFor(transfer).value();
+            transferEntity.getId(),
+            transferEntity.getStatus(),
+            transferEntity.getFromWalletId(),
+            transferEntity.getToWalletId(),
+            transferEntity.getAmount(),
+            transferEntity.getFailureReason(),
+            transferEntity.getCreatedAt());
+        short httpStatus = (short) successStatusFor(transferEntity).value();
         String body = serialize(response);
         idempotencyService.storeResponse(idempotencyKey, httpStatus, body);
 
         return new TransferOutcome(false, httpStatus, body);
     }
 
-    private TransferResponse saveTransfer(final Transfer transfer) {
-        Transfer saved = transfers.save(transfer);
+    private TransferResponse saveTransfer(final TransferEntity transferEntity) {
+        TransferEntity saved = transfers.save(transferEntity);
         return new TransferResponse(
             saved.getId(),
             saved.getStatus(),
@@ -203,8 +203,8 @@ public class TransferService {
             saved.getCreatedAt());
     }
 
-    private static HttpStatus successStatusFor(final Transfer transfer) {
-        return switch (transfer.getStatus()) {
+    private static HttpStatus successStatusFor(final TransferEntity transferEntity) {
+        return switch (transferEntity.getStatus()) {
             case PROCESSED -> HttpStatus.CREATED;
             case FAILED -> HttpStatus.UNPROCESSABLE_ENTITY;
             case PENDING -> throw new IllegalStateException(
@@ -220,6 +220,6 @@ public class TransferService {
         }
     }
 
-    private record LockedWallets(Wallet from, Wallet to) {
+    private record LockedWallets(WalletEntity from, WalletEntity to) {
     }
 }
