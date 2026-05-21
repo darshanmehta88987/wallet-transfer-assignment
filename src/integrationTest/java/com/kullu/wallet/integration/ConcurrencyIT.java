@@ -107,11 +107,21 @@ class ConcurrencyIT extends AbstractPostgresIntegrationTest {
             } catch (IdempotencyConflictException e) {
                 // A concurrent duplicate that lost the unique-key race before
                 // the original committed. The contract is that the caller
-                // retries; for the test, simply retry once to confirm we
-                // eventually converge on the same response.
+                // retries; the window between tryClaim and storeResponse means
+                // a single retry can still hit IN_FLIGHT, so we retry in a
+                // bounded loop with backoff.
                 inFlightConflicts.incrementAndGet();
-                TransferOutcome retry = transferService.createTransfer(
-                    new CreateTransferRequest(key, from, to, amount));
+                TransferOutcome retry = null;
+                for (int attempt = 0; attempt < 10; attempt++) {
+                    try {
+                        retry = transferService.createTransfer(
+                            new CreateTransferRequest(key, from, to, amount));
+                        break;
+                    } catch (IdempotencyConflictException ex) {
+                        if (attempt == 9) throw e;
+                        Thread.sleep(10);
+                    }
+                }
                 bodies.add(retry.getResponseBody());
             }
         });
@@ -185,9 +195,17 @@ class ConcurrencyIT extends AbstractPostgresIntegrationTest {
                 transferService.createTransfer(
                     new CreateTransferRequest(key, from, to, amount));
             } catch (IdempotencyConflictException e) {
-                // Retry the contested shared key.
-                transferService.createTransfer(
-                    new CreateTransferRequest(key, from, to, amount));
+                // Retry the contested shared key with backoff.
+                for (int attempt = 0; attempt < 10; attempt++) {
+                    try {
+                        transferService.createTransfer(
+                            new CreateTransferRequest(key, from, to, amount));
+                        break;
+                    } catch (IdempotencyConflictException ex) {
+                        if (attempt == 9) throw e;
+                        Thread.sleep(10);
+                    }
+                }
             }
         });
 
