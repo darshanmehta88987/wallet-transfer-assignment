@@ -1,9 +1,10 @@
 package com.kullu.wallet.service;
 
+import org.springframework.stereotype.Service;
+
 import com.kullu.wallet.dto.response.LedgerResponse;
 import com.kullu.wallet.entity.LedgerEntry;
 import com.kullu.wallet.repository.LedgerEntryRepository;
-import org.springframework.stereotype.Service;
 
 @Service
 public class LedgerService {

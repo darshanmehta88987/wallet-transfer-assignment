@@ -142,9 +142,19 @@ The full design rationale is in [`approach.md`](./approach.md). Condensed:
 # (Testcontainers — requires a running Docker daemon)
 ./gradlew integrationTest
 
-# Everything (unit + integration)
+# Everything: tests + integration tests + Spotless (format) + Checkstyle (lint)
 ./gradlew check
 ```
+
+### Code quality gates
+
+| Gate | Tool | Config | Auto-fix |
+|------|------|--------|----------|
+| Format | Spotless | rules inline in `build.gradle.kts` | `./gradlew spotlessApply` |
+| Lint   | Checkstyle 10.17 | `config/checkstyle/checkstyle.xml` | manual |
+
+Both run as part of `./gradlew check` and any violation fails the build.
+
 
 ## See also
 

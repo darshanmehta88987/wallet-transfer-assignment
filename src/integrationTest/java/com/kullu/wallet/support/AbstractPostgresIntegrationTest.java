@@ -1,11 +1,12 @@
 package com.kullu.wallet.support;
 
-import com.kullu.wallet.entity.Wallet;
-import com.kullu.wallet.repository.WalletRepository;
+import java.util.concurrent.atomic.AtomicInteger;
+
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ContextConfiguration;
 
-import java.util.concurrent.atomic.AtomicInteger;
+import com.kullu.wallet.entity.Wallet;
+import com.kullu.wallet.repository.WalletRepository;
 
 @SpringBootTest
 @ContextConfiguration(initializers = PostgresContainerInitializer.class)

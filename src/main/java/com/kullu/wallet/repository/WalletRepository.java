@@ -1,13 +1,15 @@
 package com.kullu.wallet.repository;
 
-import com.kullu.wallet.entity.Wallet;
+import java.util.Optional;
+
 import jakarta.persistence.LockModeType;
+
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-import java.util.Optional;
+import com.kullu.wallet.entity.Wallet;
 
 public interface WalletRepository extends JpaRepository<Wallet, String> {
 

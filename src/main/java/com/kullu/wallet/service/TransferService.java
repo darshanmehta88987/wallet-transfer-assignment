@@ -1,5 +1,16 @@
 package com.kullu.wallet.service;
 
+import java.util.Comparator;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.kullu.wallet.dto.request.CreateTransferRequest;
@@ -13,16 +24,6 @@ import com.kullu.wallet.entity.Wallet;
 import com.kullu.wallet.exception.IdempotencyConflictException;
 import com.kullu.wallet.exception.SelfTransferException;
 import com.kullu.wallet.repository.TransferRepository;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.http.HttpStatus;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
-import java.util.Comparator;
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
 
 /**
  * Orchestrates wallet-to-wallet transfers with idempotent semantics, safe

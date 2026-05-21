@@ -1,23 +1,7 @@
 package com.kullu.wallet.integration;
 
-import com.kullu.wallet.dto.request.CreateTransferRequest;
-import com.kullu.wallet.entity.LedgerEntry;
-import com.kullu.wallet.entity.TransferStatus;
-import com.kullu.wallet.exception.IdempotencyConflictException;
-import com.kullu.wallet.exception.InsufficientFundsException;
-import com.kullu.wallet.repository.IdempotencyRecordRepository;
-import com.kullu.wallet.repository.LedgerEntryRepository;
-import com.kullu.wallet.repository.TransferRepository;
-import com.kullu.wallet.repository.WalletRepository;
-import com.kullu.wallet.dto.response.TransferOutcome;
-import com.kullu.wallet.service.TransferService;
-import com.kullu.wallet.support.AbstractPostgresIntegrationTest;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
-import org.springframework.beans.factory.annotation.Autowired;
+import static org.assertj.core.api.Assertions.assertThat;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -25,7 +9,22 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import static org.assertj.core.api.Assertions.assertThat;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
+import org.springframework.beans.factory.annotation.Autowired;
+
+import com.kullu.wallet.dto.request.CreateTransferRequest;
+import com.kullu.wallet.dto.response.TransferOutcome;
+import com.kullu.wallet.entity.LedgerEntry;
+import com.kullu.wallet.exception.IdempotencyConflictException;
+import com.kullu.wallet.exception.InsufficientFundsException;
+import com.kullu.wallet.repository.IdempotencyRecordRepository;
+import com.kullu.wallet.repository.LedgerEntryRepository;
+import com.kullu.wallet.repository.TransferRepository;
+import com.kullu.wallet.repository.WalletRepository;
+import com.kullu.wallet.service.TransferService;
+import com.kullu.wallet.support.AbstractPostgresIntegrationTest;
 
 class ConcurrencyIT extends AbstractPostgresIntegrationTest {
 

@@ -1,14 +1,16 @@
 package com.kullu.wallet.controller;
 
-import com.kullu.wallet.dto.request.CreateTransferRequest;
-import com.kullu.wallet.dto.response.TransferOutcome;
-import com.kullu.wallet.service.TransferService;
 import jakarta.validation.Valid;
+
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
+import com.kullu.wallet.dto.request.CreateTransferRequest;
+import com.kullu.wallet.dto.response.TransferOutcome;
+import com.kullu.wallet.service.TransferService;
 
 @RestController
 @RequestMapping("/transfers")

@@ -1,9 +1,10 @@
 package com.kullu.wallet.repository;
 
-import com.kullu.wallet.entity.Transfer;
+import java.util.UUID;
+
 import org.springframework.data.jpa.repository.JpaRepository;
 
-import java.util.UUID;
+import com.kullu.wallet.entity.Transfer;
 
 public interface TransferRepository extends JpaRepository<Transfer, UUID> {
 }

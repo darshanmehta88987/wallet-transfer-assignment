@@ -1,7 +1,9 @@
 plugins {
     java
+    checkstyle
     id("org.springframework.boot") version "3.3.5"
     id("io.spring.dependency-management") version "1.1.6"
+    id("com.diffplug.spotless") version "6.25.0"
 }
 
 group = "com.kullu"
@@ -63,6 +65,37 @@ tasks.test {
     useJUnitPlatform()
 }
 
+// ── Format: Spotless ────────────────────────────────────────────────────────
+// Pragmatic, low-churn rules tuned to the existing code style. Keeps
+// `./gradlew spotlessCheck` meaningful without forcing a project-wide
+// reformat. Use `./gradlew spotlessApply` to fix violations automatically.
+spotless {
+    java {
+        target("src/**/*.java")
+        removeUnusedImports()
+        importOrder("java", "javax", "jakarta", "org", "com", "")
+        trimTrailingWhitespace()
+        endWithNewline()
+        indentWithSpaces(4)
+    }
+}
+
+// ── Lint: Checkstyle ────────────────────────────────────────────────────────
+// Custom focused ruleset at config/checkstyle/checkstyle.xml. Kept
+// intentionally lean so violations indicate real problems.
+checkstyle {
+    toolVersion = "10.17.0"
+    configFile = rootProject.file("config/checkstyle/checkstyle.xml")
+    isIgnoreFailures = false
+    maxWarnings = 0
+}
+
+// Checkstyle auto-creates a task per source set
+// (checkstyleMain, checkstyleTest, checkstyleIntegrationTest). Nothing extra
+// to register here; the `check` task already aggregates them via the
+// Checkstyle plugin's wiring.
+
 tasks.check {
     dependsOn(integrationTest)
+    dependsOn("spotlessCheck")
 }

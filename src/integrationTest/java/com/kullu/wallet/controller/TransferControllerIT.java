@@ -1,16 +1,13 @@
 package com.kullu.wallet.controller;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.kullu.wallet.dto.request.CreateTransferRequest;
-import com.kullu.wallet.entity.EntryType;
-import com.kullu.wallet.entity.LedgerEntry;
-import com.kullu.wallet.entity.TransferStatus;
-import com.kullu.wallet.repository.IdempotencyRecordRepository;
-import com.kullu.wallet.repository.LedgerEntryRepository;
-import com.kullu.wallet.repository.TransferRepository;
-import com.kullu.wallet.repository.WalletRepository;
-import com.kullu.wallet.support.AbstractPostgresIntegrationTest;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import java.util.List;
+import java.util.UUID;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,13 +16,16 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
-import java.util.List;
-import java.util.UUID;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.kullu.wallet.dto.request.CreateTransferRequest;
+import com.kullu.wallet.entity.EntryType;
+import com.kullu.wallet.entity.LedgerEntry;
+import com.kullu.wallet.repository.IdempotencyRecordRepository;
+import com.kullu.wallet.repository.LedgerEntryRepository;
+import com.kullu.wallet.repository.TransferRepository;
+import com.kullu.wallet.repository.WalletRepository;
+import com.kullu.wallet.support.AbstractPostgresIntegrationTest;
 
 @AutoConfigureMockMvc
 class TransferControllerIT extends AbstractPostgresIntegrationTest {

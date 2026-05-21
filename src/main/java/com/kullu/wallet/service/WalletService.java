@@ -1,11 +1,12 @@
 package com.kullu.wallet.service;
 
+import java.util.Optional;
+
+import org.springframework.stereotype.Service;
+
 import com.kullu.wallet.entity.Wallet;
 import com.kullu.wallet.exception.WalletNotFoundException;
 import com.kullu.wallet.repository.WalletRepository;
-import org.springframework.stereotype.Service;
-
-import java.util.Optional;
 
 @Service
 public class WalletService {
