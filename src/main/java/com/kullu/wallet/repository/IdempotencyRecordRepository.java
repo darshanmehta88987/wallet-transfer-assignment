@@ -14,7 +14,7 @@ public interface IdempotencyRecordRepository extends JpaRepository<IdempotencyEn
 
     Optional<IdempotencyEntity> findByKey(String key);
 
-    @Modifying(clearAutomatically = true)
+    @Modifying
     @Query(value = """
         INSERT INTO idempotency_records (key, request_hash, transfer_id, created_at, updated_at)
         VALUES (:key, :hash, :transferId, NOW(), NOW())

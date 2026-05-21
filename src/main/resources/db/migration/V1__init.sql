@@ -5,9 +5,10 @@
 --  * Single currency. Multi-currency is out of scope.
 --  * CHECK (balance >= 0) is the structural guarantee against double-spend even
 --    if application logic is buggy.
---  * UNIQUE (transfer_id, type) on ledger_entries guarantees exactly one DEBIT
---    + one CREDIT per transfer, making the double-entry invariant impossible to
---    violate at the storage layer.
+--  * UNIQUE (transfer_id, type) on ledger_entries guarantees at most one DEBIT
+--    and at most one CREDIT per transfer. The service writes both entries in the
+--    same DB transaction as the transfer's PROCESSED state transition, so every
+--    PROCESSED transfer has exactly one of each.
 --  * idempotency_records.key is the natural PK; the FK to transfers ties the
 --    cached response to the side effects performed under that key.
 

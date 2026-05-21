@@ -1,10 +1,10 @@
 # Wallet Transfer Service
 
-A reliable walletEntity-to-walletEntity transferEntity service demonstrating safe handling of
-**idempotency**, **concurrency**, **ledger consistency**, and **transferEntity state
+A reliable wallet-to-wallet transfer service demonstrating safe handling of
+**idempotency**, **concurrency**, **ledger consistency**, and **transfer state
 transitions**.
 
-> Submission for the Robustrade `walletEntity-transferEntity-assignment`.
+> Submission for the Robustrade `wallet-transfer-assignment`.
 
 ---
 
@@ -23,7 +23,7 @@ That's it. When the logs settle the service is listening on
 `http://localhost:8080`.
 
 - **App** → `http://localhost:8080`
-- **Postgres** → `localhost:5432` (`walletEntity` / `walletEntity` / `walletEntity`)
+- **Postgres** → `localhost:5432` (`wallet` / `wallet` / `wallet`)
 
 Flyway runs on startup and creates the schema. The migration also **seeds two
 wallets** (`wallet_1` with balance `10000`, `wallet_2` with balance `0`) so the
@@ -51,11 +51,11 @@ docker compose down -v         # stop containers AND wipe the DB volume
 
 | Status | Condition |
 |--------|-----------|
-| 201 Created             | First successful execution — transferEntity `PROCESSED` |
+| 201 Created             | First successful execution — transfer `PROCESSED` |
 | 200 OK                  | Idempotent replay — same key, same payload — original body returned |
-| 422 Unprocessable Entity | First execution, insufficient funds (transferEntity persisted as `FAILED`, replayable) |
-| 400 Bad Request          | Validation error or self-transferEntity |
-| 404 Not Found            | Source or destination walletEntity does not exist |
+| 422 Unprocessable Entity | First execution, insufficient funds (transfer persisted as `FAILED`, replayable) |
+| 400 Bad Request          | Validation error or self-transfer |
+| 404 Not Found            | Source or destination wallet does not exist |
 | 409 Conflict             | Same idempotency key reused with a different payload |
 | 500 Internal Server Error | Unexpected failure |
 
@@ -75,7 +75,7 @@ Successful body:
 Error envelope:
 
 ```json
-{ "error": "WALLET_NOT_FOUND", "message": "walletEntity not found: ..." }
+{ "error": "WALLET_NOT_FOUND", "message": "wallet not found: ..." }
 ```
 
 ### Sample walkthrough
@@ -111,8 +111,8 @@ curl -X POST http://localhost:8080/transfers \
 
 The full design rationale is in [`approach.md`](./approach.md). Condensed:
 
-- **Single DB transaction per request** at `READ_COMMITTED`. The transferEntity row,
-  both walletEntity updates, both ledger entries, and the idempotency record commit
+- **Single DB transaction per request** at `READ_COMMITTED`. The transfer row,
+  both wallet updates, both ledger entries, and the idempotency record commit
   together or roll back together.
 - **Pessimistic row locking** on wallets via `SELECT ... FOR UPDATE`
   (Hibernate `PESSIMISTIC_WRITE` on Postgres). Wallets are locked in ascending
@@ -122,8 +122,10 @@ The full design rationale is in [`approach.md`](./approach.md). Condensed:
   logic:
   - `CHECK (balance >= 0)` on `wallets` — cannot double-spend even with a
     buggy service.
-  - `UNIQUE (transfer_id, type)` on `ledger_entries` — a transferEntity can produce
-    at most one DEBIT and one CREDIT row.
+  - `UNIQUE (transfer_id, type)` on `ledger_entries` — at most one DEBIT and
+    at most one CREDIT row per transfer. The service writes both entries in
+    the same DB transaction as the transfer's PROCESSED state transition, so
+    every PROCESSED transfer has exactly one of each.
   - `CHECK (from_wallet_id <> to_wallet_id)` on `transfers`.
 - **Idempotency** via a dedicated `idempotency_records` table that stores the
   request hash plus the cached response body. Replays return the cached body

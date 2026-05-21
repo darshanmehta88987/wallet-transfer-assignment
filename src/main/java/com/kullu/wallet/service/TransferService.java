@@ -126,8 +126,7 @@ public class TransferService {
     private TransferEntity createPendingTransfer(final LockedWallets wallets, final long amount) {
         TransferEntity transferEntity = new TransferEntity(
             UUID.randomUUID(), wallets.from().getId(), wallets.to().getId(), amount);
-        saveTransfer(transferEntity);
-        return transferEntity;
+        return saveTransfer(transferEntity);
     }
 
     private void claimIdempotencyKey(final String idempotencyKey,
@@ -191,16 +190,8 @@ public class TransferService {
         return new TransferOutcome(false, httpStatus, body);
     }
 
-    private TransferResponse saveTransfer(final TransferEntity transferEntity) {
-        TransferEntity saved = transfers.save(transferEntity);
-        return new TransferResponse(
-            saved.getId(),
-            saved.getStatus(),
-            saved.getFromWalletId(),
-            saved.getToWalletId(),
-            saved.getAmount(),
-            saved.getFailureReason(),
-            saved.getCreatedAt());
+    private TransferEntity saveTransfer(final TransferEntity transferEntity) {
+        return transfers.saveAndFlush(transferEntity);
     }
 
     private static HttpStatus successStatusFor(final TransferEntity transferEntity) {

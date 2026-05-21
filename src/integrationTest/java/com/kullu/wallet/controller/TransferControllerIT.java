@@ -29,7 +29,7 @@ import com.kullu.wallet.repository.WalletRepository;
 import com.kullu.wallet.support.AbstractPostgresIntegrationTest;
 
 @AutoConfigureMockMvc
-class TransferEntityControllerIT extends AbstractPostgresIntegrationTest {
+class TransferControllerIT extends AbstractPostgresIntegrationTest {
 
     @Autowired
     private MockMvc mockMvc;
